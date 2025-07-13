@@ -1,39 +1,65 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# Node modules
 node_modules/
+npm-debug.log*
+yarn-error.log
+.pnpm-debug.log*
+.env
+.env.*.local
 
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
+# macOS system files
 .DS_Store
-*.pem
 
-# local env files
-.env*.local
+# IDEs and editors
+.vscode/
+.idea/
+*.iml
 
-# typescript
+# Logs
+*.log
 *.tsbuildinfo
 
-app-example
+# React Native / Metro / Bundler
+.expo/
+.expo-shared/
+dist/
+.rncache/
+.tmp/
+tmp/
+.bundle/
+*.swp
+*.swo
+*.orig
+
+# Watchman
+.watchmanconfig
+
+# Android build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# iOS build artifacts
+ios/build/
+ios/Pods/
+ios/Podfile.lock
+ios/*.xcworkspace/
+ios/*.xcuserstate
+ios/*.xcodeproj/project.xcworkspace/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/xcshareddata/WorkspaceSettings.xcsettings
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Testing
+coverage/
+*.spec.ts.snap
+*.test.ts.snap
+
+# Misc
+*.keystore
+*.jks
