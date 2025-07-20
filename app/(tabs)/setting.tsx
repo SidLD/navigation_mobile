@@ -1,14 +1,14 @@
 // index.tsx (used as a route screen in navigation or Expo Router)
 import { Ionicons } from '@expo/vector-icons'
 import React, { useEffect, useState } from 'react'
-import { Dimensions, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Button, Dimensions, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import {
-  Camera,
-  DefaultLight,
-  FilamentScene,
-  FilamentView,
-  Model,
-  useCameraManipulator,
+    Camera,
+    DefaultLight,
+    FilamentScene,
+    FilamentView,
+    Model,
+    useCameraManipulator,
 } from 'react-native-filament'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -47,9 +47,9 @@ const COORDINATES: Record<string, CameraConfig> = {
 
 function Scene() {
   const [cameraKey, setCameraKey] = useState('DEFAULT')
+  const [customConfig, setCustomConfig] = useState<CameraConfig>(COORDINATES.DEFAULT)
   const [cameraConfig, setCameraConfig] = useState<CameraConfig>(COORDINATES.DEFAULT)
   const [controlsVisible, setControlsVisible] = useState(true)
-  const [dropdownVisible, setDropdownVisible] = useState(false)
   
   const cameraManipulator = useCameraManipulator({
     ...cameraConfig,
@@ -71,6 +71,26 @@ function Scene() {
       } catch (err) {
         console.error('Error getting camera look-at:', err)
       }
+    }
+  }
+
+  const updateCameraWithCustomCoords = () => {
+    setCameraConfig(customConfig)
+  }
+
+  const handleInputChange = (field: keyof CameraConfig, value: string) => {
+    try {
+      const numbers = value.split(',').map(Number)
+      if (numbers.length !== 3 || numbers.some(isNaN)) {
+        throw new Error('Invalid input')
+      }
+      
+      setCustomConfig(prev => ({
+        ...prev,
+        [field]: numbers as [number, number, number]
+      }))
+    } catch (error) {
+      console.error('Invalid input:', error)
     }
   }
 
@@ -104,13 +124,6 @@ function Scene() {
 
   const combinedGesture = Gesture.Race(pinchGesture, panGesture)
 
-  const coordinateOptions = Object.keys(COORDINATES)
-
-  const handleCoordinateSelect = (key: string) => {
-    setCameraKey(key)
-    setDropdownVisible(false)
-  }
-
   return (
     <>
       <GestureDetector gesture={combinedGesture}>
@@ -135,52 +148,65 @@ function Scene() {
       {controlsVisible && (
         <View style={styles.controlsPanel}>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Camera Position</Text>
-            <TouchableOpacity
-              style={styles.dropdown}
-              onPress={() => setDropdownVisible(true)}
-            >
-              <Text style={styles.dropdownText}>{cameraKey}</Text>
-              <Ionicons name="chevron-down" size={20} color="black" />
-            </TouchableOpacity>
+            <Text style={styles.inputLabel}>Eye Position</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="x, y, z"
+              value={customConfig.orbitHomePosition.join(', ')}
+              onChangeText={(text) => handleInputChange('orbitHomePosition', text)}
+              keyboardType="numbers-and-punctuation"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+          </View>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Target Position</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="x, y, z"
+              value={customConfig.targetPosition.join(', ')}
+              onChangeText={(text) => handleInputChange('targetPosition', text)}
+              keyboardType="numbers-and-punctuation"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+          </View>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Up Vector</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="x, y, z"
+              value={customConfig.upVector.join(', ')}
+              onChangeText={(text) => handleInputChange('upVector', text)}
+              keyboardType="numbers-and-punctuation"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+          </View>
+          
+          <View style={styles.buttonRow}>
+            <Button 
+              title="Apply" 
+              onPress={updateCameraWithCustomCoords} 
+              color="#6200ee"
+            />
+            <Button 
+              title="Get Coords" 
+              onPress={fetchCameraLookAt} 
+              color="#03dac5"
+            />
+          </View>
+          
+          <View style={styles.locationButtons}>
+            <Button title="Default" onPress={() => setCameraKey('DEFAULT')} />
+            <Button title="CCIS" onPress={() => setCameraKey('CCIS')} />
+            <Button title="COED" onPress={() => setCameraKey('COED')} />
+            <Button title="COM" onPress={() => setCameraKey('COM')} />
           </View>
         </View>
       )}
-
-      <Modal
-        visible={dropdownVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setDropdownVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          onPress={() => setDropdownVisible(false)}
-        >
-          <View style={styles.dropdownModal}>
-            <FlatList
-              data={coordinateOptions}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.dropdownItem,
-                    item === cameraKey && styles.selectedDropdownItem
-                  ]}
-                  onPress={() => handleCoordinateSelect(item)}
-                >
-                  <Text style={[
-                    styles.dropdownItemText,
-                    item === cameraKey && styles.selectedDropdownItemText
-                  ]}>
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </>
   )
 }
@@ -226,46 +252,21 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     fontWeight: 'bold',
   },
-  dropdown: {
+  input: {
     height: 45,
     backgroundColor: 'white',
     paddingHorizontal: 15,
     borderRadius: 10,
+    color: 'black',
+    fontSize: 16,
+  },
+  buttonRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 15,
   },
-  dropdownText: {
-    color: 'black',
-    fontSize: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dropdownModal: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    minWidth: 200,
-    maxHeight: 300,
-  },
-  dropdownItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  selectedDropdownItem: {
-    backgroundColor: '#6200ee',
-  },
-  dropdownItemText: {
-    fontSize: 16,
-    color: 'black',
-    textAlign: 'center',
-  },
-  selectedDropdownItemText: {
-    color: 'white',
-    fontWeight: 'bold',
+  locationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
 })
