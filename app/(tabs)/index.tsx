@@ -1,7 +1,7 @@
 // index.tsx (used as a route screen in navigation or Expo Router)
 import { Ionicons } from '@expo/vector-icons'
 import React, { useEffect, useState } from 'react'
-import { Dimensions, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Animated, Dimensions, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import {
   Camera,
   DefaultLight,
@@ -51,6 +51,24 @@ function Scene() {
   const [controlsVisible, setControlsVisible] = useState(true)
   const [dropdownVisible, setDropdownVisible] = useState(false)
   
+  const animatedConfig = {
+    orbitHomePosition: [
+      new Animated.Value(COORDINATES.DEFAULT.orbitHomePosition[0]),
+      new Animated.Value(COORDINATES.DEFAULT.orbitHomePosition[1]),
+      new Animated.Value(COORDINATES.DEFAULT.orbitHomePosition[2])
+    ],
+    targetPosition: [
+      new Animated.Value(COORDINATES.DEFAULT.targetPosition[0]),
+      new Animated.Value(COORDINATES.DEFAULT.targetPosition[1]),
+      new Animated.Value(COORDINATES.DEFAULT.targetPosition[2])
+    ],
+    upVector: [
+      new Animated.Value(COORDINATES.DEFAULT.upVector[0]),
+      new Animated.Value(COORDINATES.DEFAULT.upVector[1]),
+      new Animated.Value(COORDINATES.DEFAULT.upVector[2])
+    ]
+  }
+  
   const cameraManipulator = useCameraManipulator({
     ...cameraConfig,
     orbitSpeed: [0.003, 0.003],
@@ -59,7 +77,65 @@ function Scene() {
   const viewHeight = Dimensions.get('window').height
 
   useEffect(() => {
-    setCameraConfig(COORDINATES[cameraKey])
+    const newConfig = COORDINATES[cameraKey]
+    
+    // Animate to new position
+    const animations = [
+      ...animatedConfig.orbitHomePosition.map((anim, i) => 
+        Animated.timing(anim, {
+          toValue: newConfig.orbitHomePosition[i],
+          duration: 800,
+          useNativeDriver: false,
+        })
+      ),
+      ...animatedConfig.targetPosition.map((anim, i) => 
+        Animated.timing(anim, {
+          toValue: newConfig.targetPosition[i],
+          duration: 800,
+          useNativeDriver: false,
+        })
+      ),
+      ...animatedConfig.upVector.map((anim, i) => 
+        Animated.timing(anim, {
+          toValue: newConfig.upVector[i],
+          duration: 800,
+          useNativeDriver: false,
+        })
+      )
+    ]
+    
+    Animated.parallel(animations).start()
+    
+    // Update camera config with animated values
+    const updateConfig = () => {
+      setCameraConfig({
+        orbitHomePosition: [
+          animatedConfig.orbitHomePosition[0]._value,
+          animatedConfig.orbitHomePosition[1]._value,
+          animatedConfig.orbitHomePosition[2]._value
+        ],
+        targetPosition: [
+          animatedConfig.targetPosition[0]._value,
+          animatedConfig.targetPosition[1]._value,
+          animatedConfig.targetPosition[2]._value
+        ],
+        upVector: [
+          animatedConfig.upVector[0]._value,
+          animatedConfig.upVector[1]._value,
+          animatedConfig.upVector[2]._value
+        ]
+      })
+    }
+    
+    // Update config during animation
+    const interval = setInterval(updateConfig, 16) // ~60fps
+    
+    setTimeout(() => {
+      clearInterval(interval)
+      setCameraConfig(newConfig) // Set final position
+    }, 800)
+    
+    return () => clearInterval(interval)
   }, [cameraKey])
 
   const fetchCameraLookAt = () => {
