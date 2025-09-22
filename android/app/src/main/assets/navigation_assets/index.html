@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NWSSU Path Finder</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0c0c1a;
+            color: #fff;
+            overflow-x: hidden;
+            height: 100vh;
+        }
+
+        #home-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0c0c1a 0%, #1a1a3a 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.8s ease;
+        }
+
+        #home-screen.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .logo {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .logo h1 {
+            font-size: 3.5rem;
+            background: linear-gradient(45deg, #4169E1, #6A5ACD, #9370DB);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 20px rgba(100, 149, 237, 0.3);
+        }
+
+        .logo p {
+            font-size: 1.2rem;
+            color: #a0a0d0;
+        }
+
+        .start-button {
+            background: linear-gradient(45deg, #4169E1, #6A5ACD);
+            border: none;
+            color: white;
+            padding: 1.2rem 3rem;
+            font-size: 1.4rem;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 2rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(65, 105, 225, 0.4);
+        }
+
+        .start-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(65, 105, 225, 0.6);
+        }
+
+        .start-button:active {
+            transform: translateY(1px);
+        }
+
+        .loading-progress {
+            margin-top: 2rem;
+            width: 300px;
+            text-align: center;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #4169E1, #6A5ACD);
+            width: 0%;
+            transition: width 0.5s ease;
+            border-radius: 4px;
+        }
+
+        .progress-text {
+            color: #a0a0d0;
+            font-size: 0.9rem;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+        }
+
+        .container.visible {
+            opacity: 1;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1a1a3a 0%, #0c0c1a 100%);
+            padding: 1rem;
+            border-bottom: 1px solid #2a2a4a;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+        }
+
+        .header-title {
+            flex: 1;
+            text-align: right;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(100, 149, 237, 0.5);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #a0a0d0;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .content {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            position: relative;
+        }
+
+        .viewer-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(28, 28, 48, 0.9);
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+        }
+
+        .loading.hidden {
+            display: none;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #4169E1;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #loading-message {
+            margin-bottom: 0.5rem;
+            color: #fff;
+        }
+
+        #loading-submessage {
+            color: #a0a0d0;
+            font-size: 0.9rem;
+        }
+
+        .dropdown {
+            position: relative;
+            min-width: 150px;
+            z-index: 1000;
+        }
+
+        .dropdown-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem;
+            background: rgba(50, 50, 80, 0.6);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+            min-height: 36px;
+            font-size: 0.9rem;
+        }
+
+        .dropdown-header:hover {
+            background: rgba(70, 70, 100, 0.9);
+        }
+
+        .dropdown-options {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: rgba(40, 40, 65, 0.95);
+            border-radius: 6px;
+            margin-top: 0.2rem;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: all 0.4s ease;
+            z-index: 1001;
+            border: 1px solid #2a2a4a;
+        }
+
+        .dropdown.open .dropdown-options {
+            max-height: 200px;
+            opacity: 1;
+            overflow-y: auto;
+        }
+
+        .dropdown-option {
+            padding: 0.6rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid #2a2a4a;
+            min-height: 36px;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .dropdown-option:hover {
+            background: rgba(90, 90, 140, 0.8);
+        }
+
+        .dropdown-option.selected {
+            background: #4169E1;
+            color: white;
+        }
+
+        .dropdown-option:last-child {
+            border-bottom: none;
+        }
+
+        .btn {
+            padding: 0.6rem 1rem;
+            background: rgba(50, 50, 80, 0.8);
+            border: 1px solid #2a2a4a;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            min-height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+
+        .btn:hover {
+            background: rgba(70, 70, 100, 0.9);
+            transform: translateY(-2px);
+        }
+
+        .btn.primary {
+            background: #4169E1;
+        }
+
+        .btn.primary:hover {
+            background: #5a7de9;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn:disabled:hover {
+            background: rgba(50, 50, 80, 0.8);
+            transform: none;
+        }
+
+        .generate-path-btn {
+            padding: 0.6rem 1rem;
+            background: #4169E1;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+            border: 1px solid #2a2a4a;
+            min-height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+
+        .generate-path-btn:hover {
+            background: #5a7de9;
+            transform: translateY(-2px);
+        }
+
+        .generate-path-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .view-selector {
+            display: flex;
+            gap: 0.3rem;
+        }
+
+        .view-btn {
+            padding: 0.5rem 0.8rem;
+            background: rgba(50, 50, 80, 0.6);
+            border: 1px solid #2a2a4a;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+            font-size: 0.8rem;
+        }
+
+        .view-btn.active {
+            background: #4169E1;
+            box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+        }
+
+        .location-highlight {
+            position: absolute;
+            padding: 0.5rem 1rem;
+            background: rgba(65, 105, 225, 0.2);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: #4169E1;
+            pointer-events: none;
+            transform: translate(-50%, -100%);
+            white-space: nowrap;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+            border: 1px solid #4169E1;
+        }
+
+        .location-highlight::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 10px;
+            height: 10px;
+            background: #4169E1;
+            border-radius: 50%;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 0.8rem;
+            }
+            
+            .header-controls {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+            
+            .header-title {
+                text-align: center;
+                width: 100%;
+            }
+            
+            .dropdown {
+                min-width: 120px;
+            }
+            
+            .logo h1 {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Home Screen -->
+    <div id="home-screen">
+        <div class="logo">
+            <h1>Map Path Finder</h1>
+            <p>Explore your campus in 3D</p>
+        </div>
+        
+        <div class="loading-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="progress-text" id="progress-text">Loading resources... 0%</div>
+        </div>
+        
+        <button class="start-button" id="start-button" disabled>Get Started</button>
+    </div>
+
+    <!-- Main App Container (initially hidden) -->
+    <div class="container" id="app-container">
+        <header>
+            <div class="header-controls">
+                <div class="dropdown" id="from-dropdown">
+                    <div class="dropdown-header">
+                        <span id="from-dropdown-text">Start</span>
+                        <span>▼</span>
+                    </div>
+                    <div class="dropdown-options" id="from-dropdown-options"></div>
+                </div>
+                
+                <div class="dropdown" id="to-dropdown">
+                    <div class="dropdown-header">
+                        <span id="to-dropdown-text">End</span>
+                        <span>▼</span>
+                    </div>
+                    <div class="dropdown-options" id="to-dropdown-options"></div>
+                </div>
+                
+                <button id="start-path" class="generate-path-btn" disabled>Start</button>
+                
+                <div class="view-selector">
+                    <button class="view-btn active" data-view="first-person">1st Person</button>
+                    <button class="view-btn" data-view="third-person">3rd Person</button>
+                </div>
+            </div>
+            
+            <div class="header-title">
+                <h1>Campus Path Viewer</h1>
+            </div>
+        </header>
+        
+        <div class="content">
+            <div class="viewer-container">
+                <div id="canvas-container"></div>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <h3 id="loading-message">Loading Campus Data...</h3>
+                    <p id="loading-submessage">Preparing path visualization</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Using UMD versions for compatibility -->
+    <script src="file:///android_asset/navigation_assets/threejs/three.min.js"></script>
+    <script src="file:///android_asset/navigation_assets/threejs/GLTFLoader.min.js"></script>
+    <script src="file:///android_asset/navigation_assets/threejs/OrbitControls.js"></script>
+
+    <script>
+        // Global variables
+        let scene, camera, renderer, controls;
+        let model = null;
+        let pathLine = null;
+        let personModel = null;
+        let isWalking = false;
+        let walkingProgress = 0;
+        let selectedFromPoint = null;
+        let selectedToPoint = null;
+        let currentPath = null;
+        let isFlyMode = false;
+        let personDirection = new THREE.Vector3(0, 0, 1);
+        let cameraFollowing = false;
+        let currentViewMode = 'first-person';
+        
+        // JSON data variables
+        let CAMPUS_POINTS = {};
+        let PREDEFINED_PATHS = {};
+        
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+        let moveUp = false;
+        let moveDown = false;
+        let velocity = new THREE.Vector3();
+        let direction = new THREE.Vector3();
+        let speed = 5.0;
+        
+        // Resource tracking
+        let resourcesLoaded = 0;
+        let totalResources = 2; // JSON data and model
+        let preloadedModel = null; // Store the preloaded model
+
+        // Preload resources
+        async function preloadResources() {
+            const progressFill = document.getElementById('progress-fill');
+            const progressText = document.getElementById('progress-text');
+            const startButton = document.getElementById('start-button');
+            
+            try {
+                // Update progress
+                updateProgress(10, 'Loading path data...');
+                
+                // Load JSON data
+                await loadJSONData();
+                resourceLoaded();
+                
+                // Update progress
+                updateProgress(40, 'Loading campus model...');
+                
+                // Load the model but don't add to scene yet
+                preloadedModel = await loadModel();
+                resourceLoaded();
+                
+                // Final update
+                updateProgress(100, 'Ready!');
+                
+                // Enable the start button
+                startButton.disabled = false;
+                
+            } catch (error) {
+                console.error('Error preloading resources:', error);
+                progressText.textContent = 'Error loading resources. Using fallback data.';
+                progressText.style.color = '#ff6b6b';
+                
+                // Enable the start button even if there was an error
+                startButton.disabled = false;
+            }
+        }
+        
+        function updateProgress(percent, message) {
+            const progressFill = document.getElementById('progress-fill');
+            const progressText = document.getElementById('progress-text');
+            
+            progressFill.style.width = percent + '%';
+            progressText.textContent = message + ' ' + percent + '%';
+        }
+        
+        function resourceLoaded() {
+            resourcesLoaded++;
+            const percent = 10 + (resourcesLoaded / totalResources) * 90;
+            updateProgress(Math.round(percent), 'Loading resources...');
+        }
+        
+        // Initialize the home screen
+        function initHomeScreen() {
+            const startButton = document.getElementById('start-button');
+            const homeScreen = document.getElementById('home-screen');
+            const appContainer = document.getElementById('app-container');
+            
+            startButton.addEventListener('click', () => {
+                // Fade out home screen
+                homeScreen.classList.add('fade-out');
+                
+                // Show app container after a delay
+                setTimeout(() => {
+                    appContainer.classList.add('visible');
+                    initApp();
+                }, 800);
+            });
+            
+            // Start preloading resources
+            preloadResources();
+        }
+        
+        // Initialize the app
+        function initApp() {
+            // Create scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0c0c1a);
+            scene.fog = new THREE.Fog(0x0c0c1a, 10, 50);
+            
+            // Create camera - position it closer to the model
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(-25.1283, 3.0082, -1.4318);
+            
+            // Create renderer
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                alpha: true,
+                logarithmicDepthBuffer: true
+            });
+            
+            const container = document.getElementById('canvas-container');
+            
+            renderer.setSize(container.offsetWidth, container.offsetHeight);
+            renderer.shadowMap.enabled = false;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+            
+            // Add grid helper
+            const gridHelper = new THREE.GridHelper(40, 20, 0x444466, 0x222244);
+            gridHelper.position.y = -0.01;
+            scene.add(gridHelper);
+            
+            // Lighting setup
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
+            directionalLight.position.set(20, 30, 20);
+            scene.add(directionalLight);
+            
+            const fillLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            fillLight.position.set(-20, 20, 20);
+            scene.add(fillLight);
+            
+            // Add the preloaded model to the scene if available
+            if (preloadedModel) {
+                scene.add(preloadedModel);
+                model = preloadedModel;
+            } else {
+                // Create a placeholder model if preloading failed
+                createPlaceholderModel();
+            }
+            
+            // Add orbit controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.maxDistance = 150;
+            controls.minDistance = 1; // Allow getting much closer
+            controls.maxPolarAngle = Math.PI / 1.5;
+            
+            // Set the initial target
+            controls.target.set(12.8938, 2.2596, -5.5850);
+            controls.update();
+            
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize, false);
+            
+            // Initialize keyboard controls for fly mode
+            initKeyboardControls();
+            
+            // Create person model
+            createPersonModel();
+            
+            // Initialize UI after data is loaded
+            initUI();
+            
+            // Start animation loop
+            animate();
+            
+            // Hide the loading indicator
+            document.getElementById('loading').classList.add('hidden');
+        }
+        
+        // Initialize keyboard controls for fly mode
+        function initKeyboardControls() {
+            document.addEventListener('keydown', (event) => {
+                if (!isFlyMode) return;
+                
+                switch (event.code) {
+                    case 'KeyW': moveForward = true; break;
+                    case 'KeyS': moveBackward = true; break;
+                    case 'KeyA': moveLeft = true; break;
+                    case 'KeyD': moveRight = true; break;
+                    case 'KeyQ': moveUp = true; break;
+                    case 'KeyE': moveDown = true; break;
+                }
+            });
+            
+            document.addEventListener('keyup', (event) => {
+                if (!isFlyMode) return;
+                
+                switch (event.code) {
+                    case 'KeyW': moveForward = false; break;
+                    case 'KeyS': moveBackward = false; break;
+                    case 'KeyA': moveLeft = false; break;
+                    case 'KeyD': moveRight = false; break;
+                    case 'KeyQ': moveUp = false; break;
+                    case 'KeyE': moveDown = false; break;
+                }
+            });
+        }
+        
+        async function loadJSONData() {
+            try {
+                // Try to load from path.json
+                const response = await fetch('file:///android_asset/navigation_assets/path.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const jsonData = await response.json();
+                CAMPUS_POINTS = jsonData.locations;
+                PREDEFINED_PATHS = jsonData.paths;
+                
+            } catch (error) {
+                console.error('Error loading JSON data:', error);
+                
+                // Use sample data as fallback
+                CAMPUS_POINTS = {
+                    "Main Entrance": {x: 0, y: 0, z: 0},
+                    "Library": {x: 8, y: 0, z: 5},
+                    "Cafeteria": {x: -6, y: 0, z: 7},
+                    "Administration": {x: 3, y: 0, z: -4},
+                    "Student Center": {x: -5, y: 0, z: -3}
+                };
+                
+                PREDEFINED_PATHS = {
+                    "Main_Entrance_Library": {
+                        path: [
+                            {x: 0, y: 0.1, z: 0},
+                            {x: 4, y: 0.1, z: 2.5},
+                            {x: 8, y: 0.1, z: 5}
+                        ]
+                    },
+                    "Main_Entrance_Cafeteria": {
+                        path: [
+                            {x: 0, y: 0.1, z: 0},
+                            {x: -3, y: 0.1, z: 3.5},
+                            {x: -6, y: 0.1, z: 7}
+                        ]
+                    }
+                };
+            }
+        }
+        
+        function initUI() {
+            // Populate dropdowns
+            const fromOptions = document.getElementById('from-dropdown-options');
+            const toOptions = document.getElementById('to-dropdown-options');
+            
+            Object.keys(CAMPUS_POINTS).forEach(locationName => {
+                // From dropdown
+                const fromOption = document.createElement('div');
+                fromOption.className = 'dropdown-option';
+                fromOption.textContent = locationName;
+                fromOption.dataset.value = locationName;
+                fromOption.addEventListener('click', function() {
+                    document.querySelectorAll('#from-dropdown .dropdown-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    fromOption.classList.add('selected');
+                    document.getElementById('from-dropdown-text').textContent = locationName;
+                    selectedFromPoint = locationName;
+                    document.getElementById('from-dropdown').classList.remove('open');
+                    
+                    // Enable generate path button if both points are selected
+                    updateGeneratePathButton();
+                    
+                    // Navigate to lookout when both points are selected
+                    if (selectedFromPoint && selectedToPoint) {
+                        navigateToLookout();
+                    }
+                });
+                fromOptions.appendChild(fromOption);
+                
+                // To dropdown
+                const toOption = document.createElement('div');
+                toOption.className = 'dropdown-option';
+                toOption.textContent = locationName;
+                toOption.dataset.value = locationName;
+                toOption.addEventListener('click', () => {
+                    document.querySelectorAll('#to-dropdown .dropdown-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    toOption.classList.add('selected');
+                    document.getElementById('to-dropdown-text').textContent = locationName;
+                    selectedToPoint = locationName;
+                    document.getElementById('to-dropdown').classList.remove('open');
+                    
+                    // Enable generate path button if both points are selected
+                    updateGeneratePathButton();
+                    
+                    // Navigate to lookout when both points are selected
+                    if (selectedFromPoint && selectedToPoint) {
+                        navigateToLookout();
+                    }
+                });
+                toOptions.appendChild(toOption);
+            });
+            
+            // Dropdown toggle
+            document.querySelectorAll('.dropdown-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const dropdown = this.parentElement;
+                    dropdown.classList.toggle('open');
+                });
+            });
+            
+            // Button events
+            document.getElementById('start-path').addEventListener('click', startPath);
+            
+            // View mode selection
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentViewMode = this.dataset.view;
+                    
+                    // Update camera position based on view mode
+                    if (currentViewMode === 'third-person' && personModel && personModel.visible) {
+                        setupThirdPersonCamera();
+                    }
+                });
+            });
+        }
+        
+        function updateGeneratePathButton() {
+            const generateBtn = document.getElementById('start-path');
+            if (selectedFromPoint && selectedToPoint) {
+                generateBtn.disabled = false;
+            } else {
+                generateBtn.disabled = true;
+            }
+        }
+        
+        // Setup third person camera view
+        function setupThirdPersonCamera() {
+            if (!personModel || !currentPath) return;
+            
+            // Position camera behind the person
+            const cameraDistance = 3;
+            const cameraHeight = 1.5;
+            
+            // Calculate camera position behind the person
+            const cameraOffset = new THREE.Vector3(
+                -personDirection.x * cameraDistance,
+                cameraHeight,
+                -personDirection.z * cameraDistance
+            );
+            
+            const cameraPosition = personModel.position.clone().add(cameraOffset);
+            
+            // Smoothly move camera to new position
+            animateCamera(
+                [cameraPosition.x, cameraPosition.y, cameraPosition.z],
+                [personModel.position.x, personModel.position.y + 1, personModel.position.z],
+                500
+            );
+        }
+        
+        // Create person model - Adjusted to be smaller
+        function createPersonModel() {
+            const personGroup = new THREE.Group();
+            
+            // Scale factor to make the person smaller
+            const scaleFactor = 0.5;
+            
+            // Body
+            const bodyGeometry = new THREE.CylinderGeometry(0.03 * scaleFactor, 0.04 * scaleFactor, 0.12 * scaleFactor, 8);
+            const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x4169E1 });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.06 * scaleFactor;
+            personGroup.add(body);
+            
+            // Head
+            const headGeometry = new THREE.SphereGeometry(0.025 * scaleFactor, 8, 6);
+            const headMaterial = new THREE.MeshLambertMaterial({ color: 0xFFDBB5 });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 0.145 * scaleFactor;
+            personGroup.add(head);
+            
+            // Arms
+            const armGeometry = new THREE.CylinderGeometry(0.008 * scaleFactor, 0.008 * scaleFactor, 0.08 * scaleFactor, 6);
+            const armMaterial = new THREE.MeshLambertMaterial({ color: 0xFFDBB5 });
+            
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.position.set(-0.045 * scaleFactor, 0.08 * scaleFactor, 0);
+            leftArm.rotation.z = 0.3;
+            personGroup.add(leftArm);
+            
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.position.set(0.045 * scaleFactor, 0.08 * scaleFactor, 0);
+            rightArm.rotation.z = -0.3;
+            personGroup.add(rightArm);
+            
+            // Legs
+            const legGeometry = new THREE.CylinderGeometry(0.01 * scaleFactor, 0.01 * scaleFactor, 0.08 * scaleFactor, 6);
+            const legMaterial = new THREE.MeshLambertMaterial({ color: 0x2F4F4F });
+            
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(-0.015 * scaleFactor, -0.04 * scaleFactor, 0);
+            personGroup.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(0.015 * scaleFactor, -0.04 * scaleFactor, 0);
+            personGroup.add(rightLeg);
+            
+            personModel = personGroup;
+            personModel.visible = false;
+            scene.add(personModel);
+        }
+        
+        // Navigate to lookout when both points are selected
+        function navigateToLookout() {
+            if (!selectedFromPoint || !CAMPUS_POINTS[selectedFromPoint]) return;
+            
+            const lookoutPoint = CAMPUS_POINTS[selectedFromPoint];
+            const targetPosition = new THREE.Vector3(lookoutPoint.x, lookoutPoint.y + 2, lookoutPoint.z + 5);
+            const lookAtPosition = new THREE.Vector3(lookoutPoint.x, lookoutPoint.y, lookoutPoint.z);
+            
+            animateCamera(
+                [targetPosition.x, targetPosition.y, targetPosition.z],
+                [lookAtPosition.x, lookAtPosition.y, lookAtPosition.z],
+                1000
+            );
+        }
+        
+        // Camera animation function
+        function animateCamera(targetPosition, targetLookAt, duration = 1000) {
+            return new Promise((resolve) => {
+                const startPosition = camera.position.clone();
+                const startTarget = controls.target.clone();
+                const endPosition = new THREE.Vector3(...targetPosition);
+                const endTarget = new THREE.Vector3(...targetLookAt);
+                const startTime = Date.now();
+                
+                function updateCamera() {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    // Smooth step
+                    const ease = progress < 0.5 
+                        ? 4 * progress * progress * progress 
+                        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+                    
+                    camera.position.lerpVectors(startPosition, endPosition, ease);
+                    controls.target.lerpVectors(startTarget, endTarget, ease);
+                    controls.update();
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(updateCamera);
+                    } else {
+                        resolve();
+                    }
+                }
+                
+                requestAnimationFrame(updateCamera);
+            });
+        }
+
+        function startPath() {
+            if (!selectedFromPoint || !selectedToPoint) {
+                alert('Please select both start and end locations');
+                return;
+            }
+            
+            if (selectedFromPoint === selectedToPoint) {
+                alert('Start and end locations cannot be the same');
+                return;
+            }
+            
+            clearPath();
+            
+            // Create path key in format "from_to"
+            const pathKey = `${selectedFromPoint}_${selectedToPoint}`;
+            const reversePathKey = `${selectedToPoint}_${selectedFromPoint}`;
+            
+            let pathData = null;
+            let path = null;
+            let isReversed = false;
+            
+            // Try to find predefined path
+            if (PREDEFINED_PATHS[pathKey]) {
+                pathData = PREDEFINED_PATHS[pathKey];
+                path = pathData.path;
+            } else if (PREDEFINED_PATHS[reversePathKey]) {
+                pathData = PREDEFINED_PATHS[reversePathKey];
+                path = [...pathData.path].reverse(); // Reverse the path array
+                isReversed = true;
+            } else {
+                // Create a direct path as fallback
+                const start = CAMPUS_POINTS[selectedFromPoint];
+                const end = CAMPUS_POINTS[selectedToPoint];
+                
+                if (!start || !end) return;
+                
+                path = [
+                    {x: start.x, y: start.y + 0.02, z: start.z},
+                    {x: (start.x + end.x)/2, y: Math.max(start.y, end.y) + 1.0, z: (start.z + end.z)/2},
+                    {x: end.x, y: end.y + 0.02, z: end.z}
+                ];
+            }
+            
+            // Create visualization
+            if (path) {
+                const pathCoordinates = path.map(p => new THREE.Vector3(p.x, p.y, p.z));
+                
+                const curve = new THREE.CatmullRomCurve3(pathCoordinates);
+                const tubeGeometry = new THREE.TubeGeometry(curve, pathCoordinates.length * 2, 0.02, 8, false);
+                const tubeMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0x00ff00,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                pathLine = new THREE.Mesh(tubeGeometry, tubeMaterial);
+                scene.add(pathLine);
+                
+                currentPath = pathCoordinates;
+                
+                // Calculate path length for speed adjustment
+                let pathLength = 0;
+                for (let i = 1; i < pathCoordinates.length; i++) {
+                    pathLength += pathCoordinates[i].distanceTo(pathCoordinates[i-1]);
+                }
+                
+                // Adjust walking speed based on path length
+                // Longer paths will have slower walking speed
+                window.currentWalkingSpeed = Math.max(0.001, Math.min(0.0000005, 0.02 / pathLength));
+                
+                // Position person at start
+                personModel.position.copy(pathCoordinates[0]);
+                personModel.visible = true;
+                
+                // Position camera at the start location
+                const startPoint = pathCoordinates[0];
+                
+                // Determine camera direction (look toward next point if available)
+                let lookAtPoint;
+                if (pathCoordinates.length > 1) {
+                    lookAtPoint = pathCoordinates[1];
+                    personDirection = new THREE.Vector3().subVectors(lookAtPoint, startPoint).normalize();
+                } else {
+                    lookAtPoint = startPoint.clone().add(new THREE.Vector3(0, 0, 1));
+                }
+                
+                // Calculate camera position based on view mode
+                let cameraPosition;
+                if (currentViewMode === 'first-person') {
+                    // First-person view: position camera at person's eye level
+                    const eyeLevel = 0.15; // Height of eyes from ground
+                    cameraPosition = startPoint.clone().add(new THREE.Vector3(0, eyeLevel, 0));
+                } else {
+                    // Third-person view: position camera behind the person
+                    const cameraDistance = 3;
+                    const cameraHeight = 1.5;
+                    const cameraOffset = new THREE.Vector3(
+                        -personDirection.x * cameraDistance,
+                        cameraHeight,
+                        -personDirection.z * cameraDistance
+                    );
+                    cameraPosition = startPoint.clone().add(cameraOffset);
+                }
+                
+                // Animate camera to start position
+                animateCamera(
+                    [cameraPosition.x, cameraPosition.y, cameraPosition.z],
+                    [lookAtPoint.x, lookAtPoint.y, lookAtPoint.z],
+                    1000
+                ).then(() => {
+                    // Automatically start walking
+                    startWalking();
+                });
+            }
+        }
+
+        function startWalking() {
+            if (!currentPath || currentPath.length === 0) {
+                alert('Please generate a path first');
+                return;
+            }
+            
+            isWalking = true;
+            walkingProgress = 0;
+            cameraFollowing = true;
+            
+            if (currentPath.length > 0) {
+                personModel.position.copy(currentPath[0]);
+            }
+        }
+        
+        function clearPath() {
+            isWalking = false;
+            walkingProgress = 0;
+            cameraFollowing = false;
+            
+            if (pathLine) {
+                scene.remove(pathLine);
+                pathLine = null;
+            }
+            
+            personModel.visible = false;
+            
+            currentPath = null;
+        }
+
+        // Load model with optimized loading (but don't add to scene)
+        async function loadModel() {
+  return new Promise((resolve, reject) => {
+    try {
+      const loader = new THREE.GLTFLoader();
+
+
+      const tryLoadModel = (urlIndex = 0) => {
+
+        loader.load(
+          './nwssu.glb',
+          (gltf) => {
+            const model = gltf.scene;
+
+            // Scale to fit
+            const bbox = new THREE.Box3().setFromObject(model);
+            const size = bbox.getSize(new THREE.Vector3());
+            const maxDimension = Math.max(size.x, size.y, size.z);
+            const scale = 50 / maxDimension;
+            model.scale.setScalar(scale);
+
+            model.traverse((child) => {
+              if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+              }
+            });
+
+            resolve(model);
+          },
+          (xhr) => {
+            if (xhr.total) {
+              const percent = Math.round((xhr.loaded / xhr.total) * 100);
+              const progressFill = document.getElementById("progress-fill");
+              const progressText = document.getElementById("progress-text");
+
+              const overallPercent = 40 + (percent * 0.6);
+              if (progressFill) progressFill.style.width = `${overallPercent}%`;
+              if (progressText) progressText.textContent = `Loading model: ${percent}%`;
+            }
+          },
+          (error) => {
+            console.error(`Error loading model from ${currentUrl}:`, error);
+            tryLoadModel(urlIndex + 1);
+          }
+        );
+      };
+
+      tryLoadModel(0);
+
+    } catch (error) {
+      console.error("Exception in model loading:", error);
+      const placeholder = createPlaceholderModel();
+      resolve(placeholder);
+    }
+  });
+}
+
+        function createPlaceholderModel() {
+            const campusGroup = new THREE.Group();
+            
+            // Create some buildings
+            const building1 = new THREE.Mesh(
+                new THREE.BoxGeometry(4, 3, 4),
+                new THREE.MeshLambertMaterial({ color: 0x8888ff })
+            );
+            building1.position.set(-5, 1.5, 5);
+            campusGroup.add(building1);
+            
+            const building2 = new THREE.Mesh(
+                new THREE.BoxGeometry(5, 4, 3),
+                new THREE.MeshLambertMaterial({ color: 0xff8888 })
+            );
+            building2.position.set(5, 2, 3);
+            campusGroup.add(building2);
+            
+            const building3 = new THREE.Mesh(
+                new THREE.BoxGeometry(6, 5, 5),
+                new THREE.MeshLambertMaterial({ color: 0x88ff88 })
+            );
+            building3.position.set(0, 2.5, -5);
+            campusGroup.add(building3);
+            
+            const building4 = new THREE.Mesh(
+                new THREE.BoxGeometry(3, 2, 3),
+                new THREE.MeshLambertMaterial({ color: 0xffff88 })
+            );
+            building4.position.set(-7, 1, -3);
+            campusGroup.add(building4);
+            
+            return campusGroup;
+        }
+        
+        function onWindowResize() {
+            camera.aspect = document.getElementById('canvas-container').offsetWidth / document.getElementById('canvas-container').offsetHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(document.getElementById('canvas-container').offsetWidth, document.getElementById('canvas-container').offsetHeight);
+        }
+        
+        function updateFlyControls(delta) {
+            velocity.x -= velocity.x * 10.0 * delta;
+            velocity.y -= velocity.y * 10.0 * delta;
+            velocity.z -= velocity.z * 10.0 * delta;
+            
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.y = Number(moveUp) - Number(moveDown);
+            direction.normalize();
+            
+            if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
+            if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
+            if (moveUp || moveDown) velocity.y -= direction.y * speed * delta;
+            
+            camera.translateX(velocity.x * delta);
+            camera.translateY(velocity.y * delta);
+            camera.translateZ(velocity.z * delta);
+        }
+        
+        function updateCameraFollow() {
+            if (!cameraFollowing || !isWalking || isFlyMode) return;
+            
+            if (currentViewMode === 'first-person') {
+                // First-person view: position camera at person's eye level
+                const eyeLevel = 0.15; // Height of eyes from ground
+                const cameraOffset = new THREE.Vector3(0, eyeLevel, 0);
+                
+                // Set camera to person's position with eye level offset
+                camera.position.copy(personModel.position).add(cameraOffset);
+                
+                // Look in the direction the person is moving
+                const lookAtPoint = personModel.position.clone().add(personDirection);
+                camera.lookAt(lookAtPoint);
+                
+                // Update controls target to maintain smooth camera movement
+                controls.target.copy(lookAtPoint);
+                controls.update();
+            } else {
+                // Third-person view: position camera behind the person
+                const cameraDistance = 3;
+                const cameraHeight = 1.5;
+                
+                // Calculate camera position behind the person
+                const cameraOffset = new THREE.Vector3(
+                    -personDirection.x * cameraDistance,
+                    cameraHeight,
+                    -personDirection.z * cameraDistance
+                );
+                
+                const cameraPosition = personModel.position.clone().add(cameraOffset);
+                
+                // Smoothly move camera to new position
+                camera.position.lerp(cameraPosition, 0.1);
+                
+                // Look at the person
+                const lookAtPoint = personModel.position.clone().add(new THREE.Vector3(0, 1, 0));
+                camera.lookAt(lookAtPoint);
+                
+                // Update controls target
+                controls.target.copy(lookAtPoint);
+                controls.update();
+            }
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const delta = 0.0167; // Approximate 60fps
+            
+            if (isFlyMode) {
+                updateFlyControls(delta);
+            } else {
+                controls.update(); // Update orbit controls
+            }
+            
+            // Animate person walking
+            if (isWalking && currentPath && currentPath.length > 1) {
+                const speedToUse = window.currentWalkingSpeed || 0.002; // Fallback to 0.002 if not set
+                walkingProgress += speedToUse;
+
+                if (walkingProgress >= 1) {
+                    walkingProgress = 1;
+                    isWalking = false;
+                    cameraFollowing = false;
+                }
+                
+                const totalLength = currentPath.length - 1;
+                const scaledProgress = walkingProgress * totalLength;
+                const index = Math.floor(scaledProgress);
+                const fraction = scaledProgress - index;
+                
+                if (index < currentPath.length - 1) {
+                    const start = currentPath[index];
+                    const end = currentPath[index + 1];
+                    
+                    personModel.position.lerpVectors(start, end, fraction);
+                    
+                    personDirection = new THREE.Vector3().subVectors(end, start).normalize();
+                    if (personDirection.length() > 0) {
+                        personModel.lookAt(personModel.position.clone().add(personDirection));
+                    }
+                    
+                    const bobOffset = Math.sin(Date.now() * 0.01) * 0.01;
+                    personModel.position.y += bobOffset;
+                }
+            }
+            
+            // Update camera to follow person if enabled
+            updateCameraFollow();
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Start with the home screen
+        initHomeScreen();
+    </script>
+</body>
+</html>
