@@ -65,81 +65,92 @@ export default function NavigationWebView() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0c0c1a' }}>
-        <ActivityIndicator size="large" color="#4169E1" />
-        <Text style={{ color: '#fff', marginTop: 20, fontSize: 16 }}>
-          Connecting to navigation server...
-        </Text>
-      </SafeAreaView>
+      <>
+        <StatusBar barStyle="light-content" backgroundColor="#0c0c1a" />
+        <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0c0c1a' }}>
+          <ActivityIndicator size="large" color="#4169E1" />
+          <Text style={{ color: '#fff', marginTop: 20, fontSize: 16 }}>
+            Connecting to navigation server...
+          </Text>
+        </SafeAreaView>
+      </>
     );
   }
 
   if (serverError) {
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0c0c1a', padding: 20 }}>
-        <Text style={{ color: '#ff6b6b', fontSize: 18, marginBottom: 20, textAlign: 'center' }}>
-          Server Connection Error
-        </Text>
-        <Text style={{ color: '#a0a0d0', fontSize: 14, marginBottom: 30, textAlign: 'center' }}>
-          {serverError}
-        </Text>
-        <TouchableOpacity
-          onPress={retryConnection}
-          style={{
-            backgroundColor: '#4169E1',
-            paddingHorizontal: 20,
-            paddingVertical: 12,
-            borderRadius: 8,
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>
-            Retry Connection
+      <>
+        <StatusBar barStyle="light-content" backgroundColor="#0c0c1a" />
+        <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0c0c1a', padding: 20 }}>
+          <Text style={{ color: '#ff6b6b', fontSize: 18, marginBottom: 20, textAlign: 'center' }}>
+            Server Connection Error
           </Text>
-        </TouchableOpacity>
-      </SafeAreaView>
+          <Text style={{ color: '#a0a0d0', fontSize: 14, marginBottom: 30, textAlign: 'center' }}>
+            {serverError}
+          </Text>
+          <TouchableOpacity
+            onPress={retryConnection}
+            style={{
+              backgroundColor: '#4169E1',
+              paddingHorizontal: 20,
+              paddingVertical: 12,
+              borderRadius: 8,
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>
+              Retry Connection
+            </Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </>
     );
   }
 
   console.log('Rendering WebView with URL:', serverUrl);
 
   return (
-    <WebView
-      source={{ uri: serverUrl }}
-      javaScriptEnabled={true}
-      domStorageEnabled={true}
-      startInLoadingState={true}
-      allowsInlineMediaPlayback={true}
-      mediaPlaybackRequiresUserAction={false}
-      onError={(syntheticEvent) => {
-        const { nativeEvent } = syntheticEvent;
-        console.error('WebView error: ', nativeEvent);
-        console.error('WebView error code: ', nativeEvent.code);
-        console.error('WebView error description: ', nativeEvent.description);
-      }}
-      onHttpError={(syntheticEvent) => {
-        const { nativeEvent } = syntheticEvent;
-        console.error('WebView HTTP error: ', nativeEvent);
-        console.error('WebView HTTP error status: ', nativeEvent.statusCode);
-      }}
-      onLoadEnd={() => {
-        console.log('Navigation loaded successfully from localhost');
-      }}
-      onLoadStart={() => {
-        console.log('Loading navigation from localhost...', serverUrl);
-      }}
-      onMessage={(event) => {
-        console.log('WebView message:', event.nativeEvent.data);
-      }}
-      onNavigationStateChange={(navState) => {
-        console.log('Navigation state change:', {
-          url: navState.url,
-          loading: navState.loading,
-          canGoBack: navState.canGoBack,
-          canGoForward: navState.canGoForward,
-          title: navState.title
-        });
-      }}
-      style={{ backgroundColor: '#0c0c1a' }}
-    />
+    <>
+      <StatusBar barStyle="light-content" backgroundColor="#0c0c1a" />
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#0c0c1a' }}>
+        <WebView
+          source={{ uri: serverUrl }}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          startInLoadingState={true}
+          allowsInlineMediaPlayback={true}
+          mediaPlaybackRequiresUserAction={false}
+          onError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.error('WebView error: ', nativeEvent);
+            console.error('WebView error code: ', nativeEvent.code);
+            console.error('WebView error description: ', nativeEvent.description);
+          }}
+          onHttpError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.error('WebView HTTP error: ', nativeEvent);
+            console.error('WebView HTTP error status: ', nativeEvent.statusCode);
+          }}
+          onLoadEnd={() => {
+            console.log('Navigation loaded successfully from localhost');
+          }}
+          onLoadStart={() => {
+            console.log('Loading navigation from localhost...', serverUrl);
+          }}
+          onMessage={(event) => {
+            console.log('WebView message:', event.nativeEvent.data);
+          }}
+          onNavigationStateChange={(navState) => {
+            console.log('Navigation state change:', {
+              url: navState.url,
+              loading: navState.loading,
+              canGoBack: navState.canGoBack,
+              canGoForward: navState.canGoForward,
+              title: navState.title
+            });
+          }}
+          style={{ backgroundColor: '#0c0c1a' }}
+        />
+      </SafeAreaView>
+    </>
   );
 }
