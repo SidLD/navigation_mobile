@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced NWSSU GLB Viewer - Fixed Camera Navigation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        /* Header Styles */
+        header {
+            position: relative;
+            text-align: center;
+            padding: 10px 15px;
+            background: rgba(20, 20, 35, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        h1 {
+            font-size: clamp(1.5rem, 4vw, 2.2rem);
+            margin-bottom: 5px;
+            background: linear-gradient(90deg, #00dbde, #fc00ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .subtitle {
+            font-size: clamp(0.8rem, 2.5vw, 1rem);
+            opacity: 0.8;
+            max-width: 100%;
+        }
+
+        /* Burger Menu Button */
+        .burger-menu {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #00dbde;
+            font-size: 1.8rem;
+            cursor: pointer;
+            z-index: 1001;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .burger-menu:hover {
+            background: rgba(0, 219, 222, 0.1);
+        }
+
+        .burger-menu.active {
+            color: #fc00ff;
+        }
+        
+        .content {
+            flex: 1;
+            position: relative;
+            display: flex;
+        }
+        
+        .viewer-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        /* Drawer Overlay */
+        .drawer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 998;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .drawer-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Drawer/Controls Panel */
+        .controls {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: min(90vw, 350px);
+            height: 100vh;
+            background: rgba(20, 20, 35, 0.98);
+            backdrop-filter: blur(15px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 80px 20px 20px;
+            overflow-y: auto;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            z-index: 999;
+        }
+
+        .controls.active {
+            transform: translateX(0);
+        }
+
+        /* Close Button in Drawer */
+        .close-drawer {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #fc00ff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .close-drawer:hover {
+            background: rgba(252, 0, 255, 0.1);
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+        }
+        
+        h2 {
+            font-size: 1.1rem;
+            margin-bottom: 12px;
+            color: #00dbde;
+            position: relative;
+            padding-bottom: 6px;
+        }
+        
+        h2::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 40px;
+            height: 2px;
+            background: linear-gradient(90deg, #00dbde, #fc00ff);
+            border-radius: 2px;
+        }
+        
+        .dropdown {
+            position: relative;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        .dropdown-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: rgba(50, 50, 80, 0.6);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+        }
+        
+        .dropdown-header:hover {
+            background: rgba(70, 70, 100, 0.8);
+        }
+        
+        .dropdown-options {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: rgba(40, 40, 65, 0.95);
+            border-radius: 8px;
+            margin-top: 5px;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: all 0.4s ease;
+            z-index: 10;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .dropdown.open .dropdown-options {
+            max-height: 250px;
+            opacity: 1;
+        }
+        
+        .dropdown-option {
+            padding: 10px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            font-size: 0.9rem;
+        }
+        
+        .dropdown-option:hover {
+            background: rgba(90, 90, 140, 0.8);
+        }
+        
+        .dropdown-option.selected {
+            background: linear-gradient(90deg, #00dbde, #fc00ff);
+            color: white;
+        }
+        
+        .tracking-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        
+        .track-btn {
+            flex: 1;
+            padding: 8px;
+            background: rgba(50, 50, 80, 0.6);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.8rem;
+        }
+        
+        .track-btn:hover {
+            background: rgba(70, 70, 100, 0.8);
+        }
+        
+        .track-btn.active {
+            background: linear-gradient(90deg, #00dbde, #fc00ff);
+        }
+        
+        .track-btn.clear {
+            background: rgba(200, 50, 50, 0.6);
+        }
+        
+        .track-btn.clear:hover {
+            background: rgba(220, 70, 70, 0.8);
+        }
+        
+        .coordinate-display {
+            background: rgba(30, 30, 50, 0.7);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-left: 3px solid #00dbde;
+        }
+        
+        .coordinate-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .coordinate-item:last-child {
+            border-bottom: none;
+        }
+        
+        .coordinate-label {
+            font-weight: bold;
+            color: #00dbde;
+            font-size: 0.9rem;
+        }
+        
+        .coordinate-value {
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #fff;
+        }
+        
+        .point-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(20, 20, 40, 0.5);
+            border-radius: 8px;
+            padding: 8px;
+        }
+        
+        .point-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px;
+            margin-bottom: 4px;
+            background: rgba(50, 50, 80, 0.3);
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        
+        .point-item:hover {
+            background: rgba(70, 70, 100, 0.5);
+        }
+        
+        .point-name {
+            font-weight: bold;
+            color: #00dbde;
+            flex: 1;
+            font-size: 0.8rem;
+        }
+        
+        .point-coords {
+            font-family: monospace;
+            font-size: 0.7rem;
+            color: #ccc;
+            margin-right: 8px;
+        }
+        
+        .delete-point {
+            background: rgba(200, 50, 50, 0.6);
+            border: none;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.7rem;
+        }
+        
+        .delete-point:hover {
+            background: rgba(220, 70, 70, 0.8);
+        }
+        
+        .export-section {
+            margin-top: 12px;
+        }
+        
+        .export-btn {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(90deg, #00dbde, #fc00ff);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .export-btn:hover {
+            opacity: 0.9;
+        }
+        
+        .name-input {
+            width: 100%;
+            padding: 8px;
+            background: rgba(50, 50, 80, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: white;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .name-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(10, 10, 20, 0.9);
+            z-index: 100;
+            transition: opacity 0.5s ease;
+        }
+        
+        .loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(0, 219, 222, 0.3);
+            border-top: 4px solid #00dbde;
+            border-radius: 50%;
+            animation: spin 1.2s linear infinite;
+            margin-bottom: 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .instructions {
+            background: rgba(30, 30, 50, 0.5);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 12px;
+            font-size: 0.8rem;
+            line-height: 1.3;
+        }
+        
+        .instructions h3 {
+            color: #00dbde;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .instructions ul {
+            padding-left: 15px;
+        }
+        
+        .instructions li {
+            margin-bottom: 3px;
+        }
+        
+        .camera-btn {
+            flex: 1;
+            padding: 8px;
+            background: rgba(50, 50, 80, 0.6);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.8rem;
+        }
+        
+        .camera-btn:hover {
+            background: rgba(70, 70, 100, 0.8);
+        }
+        
+        .camera-btn.active {
+            background: linear-gradient(90deg, #00dbde, #fc00ff);
+        }
+
+        /* Navigation Mode Controls */
+        .navigation-modes {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+
+        .nav-mode-btn {
+            flex: 1;
+            padding: 6px 3px;
+            background: rgba(50, 50, 80, 0.6);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.7rem;
+            text-align: center;
+        }
+
+        .nav-mode-btn:hover {
+            background: rgba(70, 70, 100, 0.8);
+        }
+
+        .nav-mode-btn.active {
+            background: linear-gradient(90deg, #00dbde, #fc00ff);
+            box-shadow: 0 0 8px rgba(0, 219, 222, 0.3);
+        }
+
+        .fly-mode-info {
+            background: rgba(30, 30, 50, 0.5);
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 8px;
+            font-size: 0.7rem;
+            line-height: 1.2;
+            display: none;
+        }
+
+        .fly-mode-info.active {
+            display: block;
+        }
+
+        .fly-mode-info h4 {
+            color: #fc00ff;
+            margin-bottom: 4px;
+            font-size: 0.8rem;
+        }
+
+        .fly-speed-control {
+            margin-top: 8px;
+        }
+
+        .fly-speed-control label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 0.7rem;
+            color: #00dbde;
+        }
+
+        .fly-speed-control input {
+            width: 100%;
+            height: 15px;
+            background: rgba(50, 50, 80, 0.6);
+            border: none;
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .fly-speed-control input::-webkit-slider-thumb {
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #00dbde;
+            cursor: pointer;
+        }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 768px) {
+            .burger-menu {
+                font-size: 1.5rem;
+                width: 35px;
+                height: 35px;
+            }
+
+            h1 {
+                padding-left: 50px;
+                padding-right: 50px;
+            }
+
+            .controls {
+                padding: 70px 15px 15px;
+            }
+
+            .coordinate-display {
+                padding: 10px;
+            }
+
+            .point-list {
+                max-height: 150px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .controls {
+                width: 95vw;
+                padding: 60px 12px 12px;
+            }
+
+            h2 {
+                font-size: 1rem;
+            }
+
+            .tracking-controls {
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .track-btn {
+                width: 100%;
+            }
+
+            .navigation-modes {
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .nav-mode-btn {
+                width: 100%;
+                padding: 8px;
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <button class="burger-menu" id="burger-menu">☰</button>
+            <h1>NWSSU</h1>
+            <p class="subtitle">Prototype</p>
+        </header>
+        
+        <div class="content">
+            <div class="viewer-container">
+                <div id="canvas-container"></div>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <h3>Loading Campus Model...</h3>
+                    <p>Preparing coordinate tracking</p>
+                </div>
+            </div>
+
+            <!-- Drawer Overlay -->
+            <div class="drawer-overlay" id="drawer-overlay"></div>
+            
+            <div class="controls" id="controls-drawer">
+                <button class="close-drawer" id="close-drawer">✕</button>
+                
+                <div class="control-group">
+                    <h2>Navigation Mode</h2>
+                    <div class="navigation-modes">
+                        <button id="orbit-mode" class="nav-mode-btn active">Orbit</button>
+                        <button id="fly-mode" class="nav-mode-btn">Fly</button>
+                        <button id="object-mode" class="nav-mode-btn">Object</button>
+                    </div>
+                    
+                    <div class="fly-mode-info" id="fly-mode-info">
+                        <h4>Fly Mode Controls:</h4>
+                        <ul style="margin: 0; padding-left: 15px; font-size: 0.75rem;">
+                            <li>WASD: Move forward/back/left/right</li>
+                            <li>Q/E: Move up/down</li>
+                            <li>Mouse: Look around</li>
+                            <li>Shift: Move faster</li>
+                        </ul>
+                        <div class="fly-speed-control">
+                            <label for="fly-speed">Fly Speed:</label>
+                            <input type="range" id="fly-speed" min="0.1" max="2" step="0.1" value="0.5">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h2>Camera Positions</h2>
+                    <div class="dropdown" id="dropdown">
+                        <div class="dropdown-header">
+                            <span id="dropdown-text">Select Position</span>
+                            <span>▼</span>
+                        </div>
+                        <div class="dropdown-options" id="dropdown-options"></div>
+                    </div>
+                    <button id="print-coordinates" class="camera-btn" style="margin-top: 15px; width: 100%;">
+                        Print Current Camera
+                    </button>
+                </div>
+
+                <div class="control-group">
+                    <h2>Coordinate Tracking</h2>
+                    <div class="instructions">
+                        <h3>How to use:</h3>
+                        <ul>
+                            <li>Click "Start Tracking" to enable</li>
+                            <li>Click anywhere on the 3D model</li>
+                            <li>Enter a name for the location</li>
+                            <li>Click "Add Point" to save</li>
+                            <li>Export when finished</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="tracking-controls">
+                        <button id="start-tracking" class="track-btn">Start Tracking</button>
+                        <button id="clear-points" class="track-btn clear">Clear All</button>
+                    </div>
+                    
+                    <div class="coordinate-display" id="coordinate-display" style="display: none;">
+                        <div class="coordinate-item">
+                            <span class="coordinate-label">X:</span>
+                            <span class="coordinate-value" id="coord-x">0.0000</span>
+                        </div>
+                        <div class="coordinate-item">
+                            <span class="coordinate-label">Y:</span>
+                            <span class="coordinate-value" id="coord-y">0.0000</span>
+                        </div>
+                        <div class="coordinate-item">
+                            <span class="coordinate-label">Z:</span>
+                            <span class="coordinate-value" id="coord-z">0.0000</span>
+                        </div>
+                        <input type="text" id="point-name" class="name-input" placeholder="Enter location name...">
+                        <button id="add-point" class="track-btn" style="width: 100%;">Add Point</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h2>Collected Points</h2>
+                    <div class="point-list" id="point-list">
+                        <p style="text-align: center; opacity: 0.6; padding: 20px;">No points collected yet</p>
+                    </div>
+                    
+                    <div class="export-section">
+                        <button id="export-points" class="export-btn">Export JavaScript Object</button>
+                        <button id="copy-points" class="export-btn">Copy to Clipboard</button>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let model = null;
+        let isTracking = false;
+        let raycaster, mouse;
+        let collectedPoints = [];
+        let currentClickPoint = null;
+        let clickMarker = null;
+        
+        let navigationMode = 'orbit'; // 'orbit', 'fly', 'object'
+        let flyControls = {
+            forward: false,
+            backward: false,
+            left: false,
+            right: false,
+            up: false,
+            down: false,
+            fast: false,
+            speed: 0.5
+        };
+        let isPointerLocked = false;
+        let euler = new THREE.Euler(0, 0, 0, 'YXZ');
+        let velocity = new THREE.Vector3();
+        let lastOrbitTarget = new THREE.Vector3(0, 0, 0);
+        
+        const COORDINATES = {
+            DEFAULT: {
+                position: [0.7578, 4.6168, -6.4757],
+                target: [12.8938, 2.2596, -5.5850],
+            },
+            CCIS: {
+                position: [-11.4023, 3.1333, -6.5408],
+                target: [-12.8938, 2.2596, -2.5850],
+            },
+            CRIM: {
+                position: [-7.0789, 2.6126, -6.3270],
+                target: [-12.8938, 2.2596, -5.5850],
+            },
+            COM: {
+                position: [-1.5614, 5.0422, 0.7315],
+                target: [12.8938, 2.2596, -5.5850],
+            },
+            DEFAULT2: {
+                position: [-24.1283, 7.0082, -11.4318],
+                target: [0.0000, 0.0000, 0.0000],
+            }
+        };
+
+        // Initialize drawer functionality
+        function initDrawer() {
+            const burgerMenu = document.getElementById('burger-menu');
+            const closeDrawer = document.getElementById('close-drawer');
+            const drawer = document.getElementById('controls-drawer');
+            const overlay = document.getElementById('drawer-overlay');
+
+            function openDrawer() {
+                drawer.classList.add('active');
+                overlay.classList.add('active');
+                burgerMenu.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeDrawerFunc() {
+                drawer.classList.remove('active');
+                overlay.classList.remove('active');
+                burgerMenu.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+
+            burgerMenu.addEventListener('click', openDrawer);
+            closeDrawer.addEventListener('click', closeDrawerFunc);
+            overlay.addEventListener('click', closeDrawerFunc);
+
+            // Close drawer on escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && drawer.classList.contains('active')) {
+                    closeDrawerFunc();
+                }
+            });
+        }
+
+        // Initialize the scene
+        function init() {
+            
+            // Create scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0c0c1a);
+            scene.fog = new THREE.Fog(0x0c0c1a, 10, 50);
+            
+            // Create camera with your coordinate system
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(...COORDINATES.DEFAULT.position);
+            
+            // Create renderer
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                alpha: true,
+                logarithmicDepthBuffer: true
+            });
+            
+            const container = document.getElementById('canvas-container');
+            
+            renderer.setSize(container.offsetWidth, container.offsetHeight);
+            renderer.shadowMap.enabled = false;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+            
+            // Initialize raycaster and mouse for click detection
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            
+            // Add grid helper with larger size
+            const gridHelper = new THREE.GridHelper(40, 20, 0x444466, 0x222244);
+            gridHelper.position.y = -0.01;
+            scene.add(gridHelper);
+            
+            // Enhanced lighting setup
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
+            directionalLight.position.set(20, 30, 20);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+            
+            const fillLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            fillLight.position.set(-20, 20, 20);
+            scene.add(fillLight);
+            
+            const backLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            backLight.position.set(10, 20, -20);
+            scene.add(backLight);
+            
+            const topLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            topLight.position.set(0, 50, 0);
+            scene.add(topLight);
+            
+            // Add orbit controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.maxDistance = 150;
+            controls.minDistance = 2;
+            controls.maxPolarAngle = Math.PI / 1.5;
+            
+            controls.target.set(...COORDINATES.DEFAULT.target);
+            lastOrbitTarget.copy(controls.target);
+            controls.update();
+            
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize, false);
+            
+            // Initialize UI components
+            initDrawer();
+            initNavigationModes();
+            initDropdown();
+            initCoordinatePrinter();
+            initTrackingControls();
+            
+            // Add event listeners
+            const container_el = document.getElementById('canvas-container');
+            container_el.addEventListener('click', onMouseClick, false);
+            container_el.addEventListener('mousemove', onMouseMove, false);
+            
+            // Load the model
+            loadModel();
+        }
+
+        // Initialize navigation mode controls
+        function initNavigationModes() {
+            const orbitBtn = document.getElementById('orbit-mode');
+            const flyBtn = document.getElementById('fly-mode');
+            const objectBtn = document.getElementById('object-mode');
+            const flyInfo = document.getElementById('fly-mode-info');
+            const flySpeedSlider = document.getElementById('fly-speed');
+            const container = document.getElementById('canvas-container');
+
+            // Mode switching
+            orbitBtn.addEventListener('click', () => setNavigationMode('orbit'));
+            flyBtn.addEventListener('click', () => setNavigationMode('fly'));
+            objectBtn.addEventListener('click', () => setNavigationMode('object'));
+
+            // Fly speed control
+            flySpeedSlider.addEventListener('input', (e) => {
+                flyControls.speed = parseFloat(e.target.value);
+            });
+
+            // Keyboard controls for fly mode
+            document.addEventListener('keydown', (e) => {
+                if (navigationMode !== 'fly') return;
+                
+                switch (e.code) {
+                    case 'KeyW': flyControls.forward = true; break;
+                    case 'KeyS': flyControls.backward = true; break;
+                    case 'KeyA': flyControls.left = true; break;
+                    case 'KeyD': flyControls.right = true; break;
+                    case 'KeyQ': flyControls.down = true; break;
+                    case 'KeyE': flyControls.up = true; break;
+                    case 'ShiftLeft': flyControls.fast = true; break;
+                    case 'Escape': 
+                        if (isPointerLocked) {
+                            document.exitPointerLock();
+                        }
+                        break;
+                }
+            });
+
+            document.addEventListener('keyup', (e) => {
+                if (navigationMode !== 'fly') return;
+                
+                switch (e.code) {
+                    case 'KeyW': flyControls.forward = false; break;
+                    case 'KeyS': flyControls.backward = false; break;
+                    case 'KeyA': flyControls.left = false; break;
+                    case 'KeyD': flyControls.right = false; break;
+                    case 'KeyQ': flyControls.down = false; break;
+                    case 'KeyE': flyControls.up = false; break;
+                    case 'ShiftLeft': flyControls.fast = false; break;
+                }
+            });
+
+            // Pointer lock for fly mode
+            container.addEventListener('click', () => {
+                if (navigationMode === 'fly' && !isTracking) {
+                    container.requestPointerLock();
+                }
+            });
+
+            document.addEventListener('pointerlockchange', () => {
+                isPointerLocked = document.pointerLockElement === container;
+                if (navigationMode === 'fly') {
+                    container.style.cursor = isPointerLocked ? 'none' : 'pointer';
+                }
+            });
+
+            // Mouse movement for fly mode
+            document.addEventListener('mousemove', (e) => {
+                if (navigationMode === 'fly' && isPointerLocked && !isTracking) {
+                    const movementX = e.movementX || 0;
+                    const movementY = e.movementY || 0;
+
+                    euler.setFromQuaternion(camera.quaternion);
+                    euler.y -= movementX * 0.002;
+                    euler.x -= movementY * 0.002;
+                    euler.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, euler.x));
+
+                    camera.quaternion.setFromEuler(euler);
+                }
+            });
+        }
+
+        // Set navigation mode
+        function setNavigationMode(mode) {
+            const previousMode = navigationMode;
+            navigationMode = mode;
+            
+            // Update button states
+            document.querySelectorAll('.nav-mode-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(mode + '-mode').classList.add('active');
+            
+            // Show/hide fly mode info
+            const flyInfo = document.getElementById('fly-mode-info');
+            flyInfo.classList.toggle('active', mode === 'fly');
+            
+            const container = document.getElementById('canvas-container');
+            
+            // Configure controls based on mode
+            switch (mode) {
+                case 'orbit':
+                    // Save the current camera direction to use as target
+                    if (previousMode === 'fly') {
+                        const direction = new THREE.Vector3(0, 0, -1);
+                        direction.applyQuaternion(camera.quaternion);
+                        const target = new THREE.Vector3().copy(camera.position).add(direction.multiplyScalar(10));
+                        controls.target.copy(target);
+                        lastOrbitTarget.copy(target);
+                    }
+                    
+                    controls.enabled = true;
+                    controls.enableRotate = true;
+                    controls.enablePan = true;
+                    controls.enableZoom = true;
+                    container.style.cursor = isTracking ? 'crosshair' : 'default';
+                    if (isPointerLocked) document.exitPointerLock();
+                    break;
+                    
+                case 'fly':
+                    // Save the current orbit target
+                    lastOrbitTarget.copy(controls.target);
+                    
+                    controls.enabled = false;
+                    container.style.cursor = 'pointer';
+                    break;
+                    
+                case 'object':
+                    // Save the current camera direction to use as target
+                    if (previousMode === 'fly') {
+                        const direction = new THREE.Vector3(0, 0, -1);
+                        direction.applyQuaternion(camera.quaternion);
+                        const target = new THREE.Vector3().copy(camera.position).add(direction.multiplyScalar(10));
+                        controls.target.copy(target);
+                        lastOrbitTarget.copy(target);
+                    }
+                    
+                    controls.enabled = true;
+                    controls.enableRotate = false; // Disable camera rotation
+                    controls.enablePan = true;     // Allow panning
+                    controls.enableZoom = true;    // Allow zooming
+                    container.style.cursor = isTracking ? 'crosshair' : 'move';
+                    if (isPointerLocked) document.exitPointerLock();
+                    break;
+            }
+        }
+
+        // Update fly controls
+        function updateFlyControls() {
+            if (navigationMode !== 'fly' || !isPointerLocked) return;
+
+            const speed = flyControls.speed * (flyControls.fast ? 3 : 1);
+            const direction = new THREE.Vector3();
+
+            camera.getWorldDirection(direction);
+            const right = new THREE.Vector3();
+            right.crossVectors(direction, camera.up).normalize();
+
+            velocity.set(0, 0, 0);
+
+            if (flyControls.forward) velocity.add(direction.clone().multiplyScalar(speed));
+            if (flyControls.backward) velocity.add(direction.clone().multiplyScalar(-speed));
+            if (flyControls.left) velocity.add(right.clone().multiplyScalar(-speed));
+            if (flyControls.right) velocity.add(right.clone().multiplyScalar(speed));
+            if (flyControls.up) velocity.add(camera.up.clone().multiplyScalar(speed));
+            if (flyControls.down) velocity.add(camera.up.clone().multiplyScalar(-speed));
+
+            camera.position.add(velocity);
+        }
+        
+        // Initialize tracking controls
+        function initTrackingControls() {
+            const startBtn = document.getElementById('start-tracking');
+            const clearBtn = document.getElementById('clear-points');
+            const addBtn = document.getElementById('add-point');
+            const exportBtn = document.getElementById('export-points');
+            const copyBtn = document.getElementById('copy-points');
+            
+            startBtn.addEventListener('click', () => {
+                isTracking = !isTracking;
+                startBtn.textContent = isTracking ? 'Stop Tracking' : 'Start Tracking';
+                startBtn.classList.toggle('active', isTracking);
+                
+                const container = document.getElementById('canvas-container');
+                if (navigationMode === 'orbit') {
+                    container.style.cursor = isTracking ? 'crosshair' : 'default';
+                } else if (navigationMode === 'object') {
+                    container.style.cursor = isTracking ? 'crosshair' : 'move';
+                }
+                
+                if (!isTracking) {
+                    hideCoordinateDisplay();
+                }
+            });
+            
+            clearBtn.addEventListener('click', () => {
+                if (confirm('Clear all collected points?')) {
+                    collectedPoints = [];
+                    updatePointList();
+                    clearClickMarker();
+                }
+            });
+            
+            addBtn.addEventListener('click', addCurrentPoint);
+            exportBtn.addEventListener('click', exportPoints);
+            copyBtn.addEventListener('click', copyToClipboard);
+        }
+        
+        // Handle mouse click for coordinate tracking
+        function onMouseClick(event) {
+            if (!isTracking) return;
+            if (navigationMode === 'fly' && isPointerLocked) return; // Prevent tracking clicks in fly mode
+            
+            const rect = event.target.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            
+            // Create array of objects to intersect with
+            const intersectObjects = [];
+            
+            // Add model if it exists
+            if (model) {
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        intersectObjects.push(child);
+                    }
+                });
+            }
+            
+            // Add grid helper for ground plane intersection
+            const gridHelper = scene.children.find(child => child.type === 'GridHelper');
+            if (gridHelper) {
+                // Create invisible plane for ground intersection
+                const planeGeometry = new THREE.PlaneGeometry(100, 100);
+                const planeMaterial = new THREE.MeshBasicMaterial({ visible: false });
+                const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+                plane.rotation.x = -Math.PI / 2;
+                plane.position.y = 0;
+                intersectObjects.push(plane);
+            }
+            
+            const intersects = raycaster.intersectObjects(intersectObjects);
+            
+            if (intersects.length > 0) {
+                const point = intersects[0].point;
+                currentClickPoint = {
+                    x: parseFloat(point.x.toFixed(4)),
+                    y: parseFloat(point.y.toFixed(4)),
+                    z: parseFloat(point.z.toFixed(4))
+                };
+                
+                showCoordinateDisplay(currentClickPoint);
+                showClickMarker(point);
+            }
+        }
+        
+        // Handle mouse move for hover effects
+        function onMouseMove(event) {
+            if (!isTracking) return;
+            if (navigationMode === 'fly') return;
+            
+            const rect = event.target.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        }
+        
+        // Show coordinate display
+        function showCoordinateDisplay(point) {
+            const display = document.getElementById('coordinate-display');
+            document.getElementById('coord-x').textContent = point.x.toFixed(4);
+            document.getElementById('coord-y').textContent = point.y.toFixed(4);
+            document.getElementById('coord-z').textContent = point.z.toFixed(4);
+            display.style.display = 'block';
+            
+            // Focus on name input
+            document.getElementById('point-name').focus();
+        }
+        
+        // Hide coordinate display
+        function hideCoordinateDisplay() {
+            document.getElementById('coordinate-display').style.display = 'none';
+            document.getElementById('point-name').value = '';
+        }
+        
+        // Show click marker
+        function showClickMarker(point) {
+            clearClickMarker();
+            
+            const geometry = new THREE.SphereGeometry(0.05, 8, 6);
+            const material = new THREE.MeshBasicMaterial({ 
+                color: 0xff0000,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            clickMarker = new THREE.Mesh(geometry, material);
+            clickMarker.position.copy(point);
+            clickMarker.position.y += 0.05; // Raise slightly above surface
+            scene.add(clickMarker);
+            
+            // Add pulsing animation
+            clickMarker.userData = { 
+                originalScale: clickMarker.scale.clone(),
+                time: 0
+            };
+        }
+        
+        // Clear click marker
+        function clearClickMarker() {
+            if (clickMarker) {
+                scene.remove(clickMarker);
+                clickMarker = null;
+            }
+        }
+        
+        // Add current point to collection
+        function addCurrentPoint() {
+            if (!currentClickPoint) return;
+            
+            const name = document.getElementById('point-name').value.trim();
+            if (!name) {
+                alert('Please enter a name for this location');
+                return;
+            }
+            
+            // Check if name already exists
+            if (collectedPoints.find(p => p.name === name)) {
+                alert('A point with this name already exists');
+                return;
+            }
+            
+            collectedPoints.push({
+                name: name,
+                x: currentClickPoint.x,
+                y: currentClickPoint.y,
+                z: currentClickPoint.z
+            });
+            
+            updatePointList();
+            hideCoordinateDisplay();
+            clearClickMarker();
+            currentClickPoint = null;
+            
+            // Add permanent marker
+            addPermanentMarker(collectedPoints[collectedPoints.length - 1]);
+        }
+        
+        // Add permanent marker for collected point
+        function addPermanentMarker(point) {
+            const geometry = new THREE.SphereGeometry(0.03, 8, 6);
+            const material = new THREE.MeshBasicMaterial({ 
+                color: 0x00ff00,
+                transparent: true,
+                opacity: 0.9
+            });
+            
+            const marker = new THREE.Mesh(geometry, material);
+            marker.position.set(point.x, point.y + 0.03, point.z);
+            marker.userData = { isCollectedPoint: true, pointName: point.name };
+            scene.add(marker);
+            
+            // Add text label
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 256;
+            canvas.height = 64;
+            context.fillStyle = '#ffffff';
+            context.font = '12px Arial';
+            context.textAlign = 'center';
+            context.fillText(point.name, 128, 40);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.position.set(point.x, point.y + 0.15, point.z);
+            sprite.scale.set(0.3, 0.075, 1);
+            sprite.userData = { isCollectedPoint: true, pointName: point.name };
+            scene.add(sprite);
+        }
+        
+        // Update point list display
+        function updatePointList() {
+            const listContainer = document.getElementById('point-list');
+            
+            if (collectedPoints.length === 0) {
+                listContainer.innerHTML = '<p style="text-align: center; opacity: 0.6; padding: 20px;">No points collected yet</p>';
+                return;
+            }
+            
+            listContainer.innerHTML = '';
+            
+            collectedPoints.forEach((point, index) => {
+                const item = document.createElement('div');
+                item.className = 'point-item';
+                
+                item.innerHTML = `
+                    <span class="point-name">${point.name}</span>
+                    <span class="point-coords">${point.x}, ${point.y}, ${point.z}</span>
+                    <button class="delete-point" onclick="deletePoint(${index})">×</button>
+                `;
+                
+                listContainer.appendChild(item);
+            });
+        }
+        
+        // Delete point
+        function deletePoint(index) {
+            const point = collectedPoints[index];
+            
+            // Remove visual markers
+            const objectsToRemove = [];
+            scene.traverse((child) => {
+                if (child.userData.isCollectedPoint && child.userData.pointName === point.name) {
+                    objectsToRemove.push(child);
+                }
+            });
+            
+            objectsToRemove.forEach(obj => scene.remove(obj));
+            
+            // Remove from array
+            collectedPoints.splice(index, 1);
+            updatePointList();
+        }
+        
+        // Export points as JavaScript object
+        function exportPoints() {
+            if (collectedPoints.length === 0) {
+                alert('No points to export');
+                return;
+            }
+            
+            const exportObject = {};
+            collectedPoints.forEach(point => {
+                exportObject[point.name] = {
+                    x: point.x,
+                    y: point.y,
+                    z: point.z
+                };
+            });
+            
+            const exportString = `const CAMPUS_POINTS = ${JSON.stringify(exportObject, null, 4)};`;
+            
+            // Create and download file
+            const blob = new Blob([exportString], { type: 'text/javascript' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'campus_points.js';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            console.log('Exported points:', exportString);
+        }
+        
+        // Copy to clipboard
+        function copyToClipboard() {
+            if (collectedPoints.length === 0) {
+                alert('No points to copy');
+                return;
+            }
+            
+            const exportObject = {};
+            collectedPoints.forEach(point => {
+                exportObject[point.name] = {
+                    x: point.x,
+                    y: point.y,
+                    z: point.z
+                };
+            });
+            
+            const exportString = `const CAMPUS_POINTS = ${JSON.stringify(exportObject, null, 4)};`;
+            
+            navigator.clipboard.writeText(exportString).then(() => {
+                alert('Points copied to clipboard!');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = exportString;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('Points copied to clipboard!');
+            });
+        }
+        
+        // Initialize coordinate printer
+        function initCoordinatePrinter() {
+            document.getElementById('print-coordinates').addEventListener('click', () => {
+                const cameraPos = camera.position;
+                let targetPos;
+                
+                // Calculate target based on current navigation mode
+                if (navigationMode === 'fly') {
+                    // For fly mode, calculate where the camera is looking
+                    const direction = new THREE.Vector3(0, 0, -1);
+                    direction.applyQuaternion(camera.quaternion);
+                    targetPos = new THREE.Vector3().copy(camera.position).add(direction.multiplyScalar(10));
+                } else {
+                    // For orbit and object modes, use the controls target
+                    targetPos = controls.target;
+                }
+                
+                const cameraCoords = [cameraPos.x.toFixed(4), cameraPos.y.toFixed(4), cameraPos.z.toFixed(4)];
+                const targetCoords = [targetPos.x.toFixed(4), targetPos.y.toFixed(4), targetPos.z.toFixed(4)];
+                
+                console.log('=== CURRENT COORDINATES ===');
+                console.log('Camera Position:', cameraCoords);
+                console.log('Target Position:', targetCoords);
+                console.log('=== COORDINATE OBJECT FORMAT ===');
+                console.log('const NEW_COORDINATE = {');
+                console.log(`    position: [${cameraCoords.join(', ')}],`);
+                console.log(`    target: [${targetCoords.join(', ')}],`);
+                console.log('};');
+                console.log('========================');
+                
+                const coordText = `Camera: [${cameraCoords.join(', ')}]\nTarget: [${targetCoords.join(', ')}]`;
+                alert('Current Coordinates:\n\n' + coordText);
+            });
+        }
+        
+        // Animate camera to coordinate position
+        function animateCameraToCoordinate(coordinateKey) {
+            const coordinate = COORDINATES[coordinateKey];
+            if (!coordinate) return;
+            
+            // Switch to orbit mode for preset positions
+            if (navigationMode !== 'orbit') {
+                setNavigationMode('orbit');
+            }
+            
+            const duration = 1000;
+            const startPosition = camera.position.clone();
+            const startTarget = controls.target.clone();
+            const endPosition = new THREE.Vector3(...coordinate.position);
+            const endTarget = new THREE.Vector3(...coordinate.target);
+            const startTime = Date.now();
+            
+            function updateCamera() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                const ease = progress < 0.5
+                    ? 4 * progress * progress * progress
+                    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+                
+                camera.position.lerpVectors(startPosition, endPosition, ease);
+                controls.target.lerpVectors(startTarget, endTarget, ease);
+                controls.update();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(updateCamera);
+                }
+            }
+            
+            requestAnimationFrame(updateCamera);
+        }
+        
+        // Load the GLB model
+        function loadModel() {
+            const loader = new THREE.GLTFLoader();
+            const modelUrl = 'nwssu.glb';
+            
+            loader.load(
+                modelUrl,
+                (gltf) => {
+                    model = gltf.scene;
+                    
+                    const bbox = new THREE.Box3().setFromObject(model);
+                    const size = bbox.getSize(new THREE.Vector3());
+                    
+                    const maxDimension = Math.max(size.x, size.y, size.z);
+                    const scale = 50 / maxDimension;
+                    model.scale.setScalar(scale);
+                    
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
+                    
+                    scene.add(model);
+                    controls.target.set(0, 0, 0);
+                    controls.update();
+                    
+                    document.getElementById('loading').classList.add('hidden');
+                    renderer.render(scene, camera);
+                },
+                (xhr) => {
+                    const percent = Math.round((xhr.loaded / xhr.total) * 100);
+                },
+                (error) => {
+                    document.getElementById('loading').classList.add('hidden');
+                    createPlaceholderModel();
+                }
+            );
+        }
+        
+        // Create a placeholder model if loading fails
+        function createPlaceholderModel() {
+            const geometry = new THREE.BoxGeometry(5, 3, 5);
+            const material = new THREE.MeshLambertMaterial({ 
+                color: 0x888888,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            model = new THREE.Mesh(geometry, material);
+            model.position.set(0, 1.5, 0);
+            model.castShadow = true;
+            model.receiveShadow = true;
+            
+            scene.add(model);
+        }
+        
+        // Initialize dropdown menu
+        function initDropdown() {
+            const dropdown = document.getElementById('dropdown');
+            const dropdownOptions = document.getElementById('dropdown-options');
+            const dropdownText = document.getElementById('dropdown-text');
+            
+            Object.keys(COORDINATES).forEach(key => {
+                const option = document.createElement('div');
+                option.className = 'dropdown-option';
+                option.textContent = key;
+                option.dataset.key = key;
+                
+                option.addEventListener('click', () => {
+                    document.querySelectorAll('.dropdown-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    option.classList.add('selected');
+                    
+                    dropdownText.textContent = key;
+                    animateCameraToCoordinate(key);
+                    dropdown.classList.remove('open');
+                });
+                
+                dropdownOptions.appendChild(option);
+            });
+            
+            dropdown.querySelector('.dropdown-header').addEventListener('click', () => {
+                dropdown.classList.toggle('open');
+            });
+            
+            document.addEventListener('click', (e) => {
+                if (!dropdown.contains(e.target)) {
+                    dropdown.classList.remove('open');
+                }
+            });
+        }
+        
+        // Handle window resize
+        function onWindowResize() {
+            camera.aspect = document.getElementById('canvas-container').offsetWidth /
+                            document.getElementById('canvas-container').offsetHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(document.getElementById('canvas-container').offsetWidth,
+                            document.getElementById('canvas-container').offsetHeight);
+        }
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Update fly controls
+            updateFlyControls();
+            
+            // Animate click marker
+            if (clickMarker) {
+                clickMarker.userData.time += 0.05;
+                const scale = 1 + Math.sin(clickMarker.userData.time) * 0.2;
+                clickMarker.scale.copy(clickMarker.userData.originalScale).multiplyScalar(scale);
+            }
+            
+            if (navigationMode === 'orbit' || navigationMode === 'object') {
+                controls.update();
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        window.deletePoint = deletePoint;
+        init();
+        animate();
+    </script>
+</body>
+</html>

@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NWSSU Path Finder - Mobile</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0c0c1a;
+            color: #fff;
+            overflow-x: hidden;
+            height: 100vh;
+        }
+
+        #home-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0c0c1a 0%, #1a1a3a 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.8s ease;
+        }
+
+        #home-screen.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .logo {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .logo h1 {
+            font-size: 3.5rem;
+            background: linear-gradient(45deg, #4169E1, #6A5ACD, #9370DB);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 20px rgba(100, 149, 237, 0.3);
+        }
+
+        .logo p {
+            font-size: 1.2rem;
+            color: #a0a0d0;
+        }
+
+        .start-button {
+            background: linear-gradient(45deg, #4169E1, #6A5ACD);
+            border: none;
+            color: white;
+            padding: 1.2rem 3rem;
+            font-size: 1.4rem;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 2rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(65, 105, 225, 0.4);
+        }
+
+        .start-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(65, 105, 225, 0.6);
+        }
+
+        .start-button:active {
+            transform: translateY(1px);
+        }
+
+        .loading-progress {
+            margin-top: 2rem;
+            width: 300px;
+            text-align: center;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #4169E1, #6A5ACD);
+            width: 0%;
+            transition: width 0.5s ease;
+            border-radius: 4px;
+        }
+
+        .progress-text {
+            color: #a0a0d0;
+            font-size: 0.9rem;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+        }
+
+        .container.visible {
+            opacity: 1;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1a1a3a 0%, #0c0c1a 100%);
+            padding: 1rem;
+            border-bottom: 1px solid #2a2a4a;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+        }
+
+        .header-title {
+            flex: 1;
+            text-align: right;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(100, 149, 237, 0.5);
+        }
+
+        .content {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            position: relative;
+        }
+
+        .viewer-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(28, 28, 48, 0.9);
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+        }
+
+        .loading.hidden {
+            display: none;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #4169E1;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #loading-message {
+            margin-bottom: 0.5rem;
+            color: #fff;
+        }
+
+        #loading-submessage {
+            color: #a0a0d0;
+            font-size: 0.9rem;
+        }
+
+        .dropdown {
+            position: relative;
+            min-width: 150px;
+            z-index: 1000;
+        }
+
+        .dropdown-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem;
+            background: rgba(50, 50, 80, 0.6);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+            min-height: 36px;
+            font-size: 0.9rem;
+        }
+
+        .dropdown-header:hover {
+            background: rgba(70, 70, 100, 0.9);
+        }
+
+        .dropdown-options {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: rgba(40, 40, 65, 0.95);
+            border-radius: 6px;
+            margin-top: 0.2rem;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: all 0.4s ease;
+            z-index: 1001;
+            border: 1px solid #2a2a4a;
+        }
+
+        .dropdown.open .dropdown-options {
+            max-height: 200px;
+            opacity: 1;
+            overflow-y: auto;
+        }
+
+        .dropdown-option {
+            padding: 0.6rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid #2a2a4a;
+            min-height: 36px;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .dropdown-option:hover {
+            background: rgba(90, 90, 140, 0.8);
+        }
+
+        .dropdown-option.selected {
+            background: #4169E1;
+            color: white;
+        }
+
+        .dropdown-option:last-child {
+            border-bottom: none;
+        }
+
+        .btn {
+            padding: 0.6rem 1rem;
+            background: rgba(50, 50, 80, 0.8);
+            border: 1px solid #2a2a4a;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            min-height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+
+        .btn:hover {
+            background: rgba(70, 70, 100, 0.9);
+            transform: translateY(-2px);
+        }
+
+        .btn.primary {
+            background: #4169E1;
+        }
+
+        .btn.primary:hover {
+            background: #5a7de9;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn:disabled:hover {
+            background: rgba(50, 50, 80, 0.8);
+            transform: none;
+        }
+
+        .generate-path-btn {
+            padding: 0.6rem 1rem;
+            background: #4169E1;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+            border: 1px solid #2a2a4a;
+            min-height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+
+        .generate-path-btn:hover {
+            background: #5a7de9;
+            transform: translateY(-2px);
+        }
+
+        .generate-path-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .view-selector {
+            display: flex;
+            gap: 0.3rem;
+        }
+
+        .view-btn {
+            padding: 0.5rem 0.8rem;
+            background: rgba(50, 50, 80, 0.6);
+            border: 1px solid #2a2a4a;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+            font-size: 0.8rem;
+        }
+
+        .view-btn.active {
+            background: #4169E1;
+            box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+        }
+
+        .mobile-info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a3a 0%, #0c0c1a 100%);
+            color: white;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .mobile-info h2 {
+            margin-bottom: 1rem;
+            color: #4169E1;
+            font-size: 2rem;
+        }
+
+        .mobile-info p {
+            margin-bottom: 2rem;
+            color: #a0a0d0;
+            font-size: 1.1rem;
+        }
+
+        .feature-card {
+            background: rgba(65, 105, 225, 0.1);
+            border: 1px solid #4169E1;
+            border-radius: 10px;
+            padding: 1.5rem;
+            max-width: 400px;
+            margin-bottom: 2rem;
+        }
+
+        .feature-card h3 {
+            margin-bottom: 1rem;
+            color: #4169E1;
+        }
+
+        .feature-list {
+            text-align: left;
+            color: #a0a0d0;
+            list-style: none;
+        }
+
+        .feature-list li {
+            margin-bottom: 0.5rem;
+            padding-left: 1rem;
+            position: relative;
+        }
+
+        .feature-list li:before {
+            content: "✓";
+            color: #4169E1;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4CAF50;
+            margin-right: 0.5rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 0.8rem;
+            }
+            
+            .header-controls {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+            
+            .header-title {
+                text-align: center;
+                width: 100%;
+            }
+            
+            .dropdown {
+                min-width: 120px;
+            }
+            
+            .logo h1 {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Home Screen -->
+    <div id="home-screen">
+        <div class="logo">
+            <h1>Map Path Finder</h1>
+            <p>Explore your campus in 3D</p>
+        </div>
+        
+        <div class="loading-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="progress-text" id="progress-text">Loading resources... 0%</div>
+        </div>
+        
+        <button class="start-button" id="start-button" disabled>Get Started</button>
+    </div>
+
+    <!-- Main App Container (initially hidden) -->
+    <div class="container" id="app-container">
+        <header>
+            <div class="header-controls">
+                <div class="dropdown" id="from-dropdown">
+                    <div class="dropdown-header">
+                        <span id="from-dropdown-text">Start</span>
+                        <span>▼</span>
+                    </div>
+                    <div class="dropdown-options" id="from-dropdown-options"></div>
+                </div>
+                
+                <div class="dropdown" id="to-dropdown">
+                    <div class="dropdown-header">
+                        <span id="to-dropdown-text">End</span>
+                        <span>▼</span>
+                    </div>
+                    <div class="dropdown-options" id="to-dropdown-options"></div>
+                </div>
+                
+                <button id="start-path" class="generate-path-btn" disabled>Start</button>
+                
+                <div class="view-selector">
+                    <button class="view-btn active" data-view="first-person">1st Person</button>
+                    <button class="view-btn" data-view="third-person">3rd Person</button>
+                </div>
+            </div>
+            
+            <div class="header-title">
+                <h1>Campus Path Viewer</h1>
+            </div>
+        </header>
+        
+        <div class="content">
+            <div class="viewer-container">
+                <div id="canvas-container"></div>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <h3 id="loading-message">Loading Campus Data...</h3>
+                    <p id="loading-submessage">Preparing path visualization</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sample data for mobile version
+        const CAMPUS_POINTS = {
+            "Main Entrance": {x: 0, y: 0, z: 0},
+            "Library": {x: 8, y: 0, z: 5},
+            "Cafeteria": {x: -6, y: 0, z: 7},
+            "Administration": {x: 3, y: 0, z: -4},
+            "Student Center": {x: -5, y: 0, z: -3},
+            "Gymnasium": {x: 10, y: 0, z: -2},
+            "Parking Lot": {x: -8, y: 0, z: -5},
+            "Auditorium": {x: 5, y: 0, z: 8}
+        };
+        
+        const PREDEFINED_PATHS = {
+            "Main_Entrance_Library": {
+                path: [
+                    {x: 0, y: 0.1, z: 0},
+                    {x: 4, y: 0.1, z: 2.5},
+                    {x: 8, y: 0.1, z: 5}
+                ]
+            },
+            "Main_Entrance_Cafeteria": {
+                path: [
+                    {x: 0, y: 0.1, z: 0},
+                    {x: -3, y: 0.1, z: 3.5},
+                    {x: -6, y: 0.1, z: 7}
+                ]
+            },
+            "Library_Student_Center": {
+                path: [
+                    {x: 8, y: 0.1, z: 5},
+                    {x: 1.5, y: 0.1, z: 1},
+                    {x: -5, y: 0.1, z: -3}
+                ]
+            }
+        };
+
+        let selectedFromPoint = null;
+        let selectedToPoint = null;
+
+        // Initialize the home screen
+        function initHomeScreen() {
+            const startButton = document.getElementById('start-button');
+            const homeScreen = document.getElementById('home-screen');
+            const appContainer = document.getElementById('app-container');
+            
+            // Simulate loading
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 10;
+                document.getElementById('progress-fill').style.width = progress + '%';
+                document.getElementById('progress-text').textContent = 'Loading resources... ' + progress + '%';
+                
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                    startButton.disabled = false;
+                }
+            }, 200);
+            
+            startButton.addEventListener('click', () => {
+                homeScreen.classList.add('fade-out');
+                setTimeout(() => {
+                    appContainer.classList.add('visible');
+                    initApp();
+                }, 800);
+            });
+        }
+        
+        function initApp() {
+            // Create mobile-optimized interface
+            const canvasContainer = document.getElementById('canvas-container');
+            canvasContainer.innerHTML = `
+                <div class="mobile-info">
+                    <h2><span class="status-indicator"></span>Campus Navigation System</h2>
+                    <p>Mobile-Optimized Path Finding Interface</p>
+                    
+                    <div class="feature-card">
+                        <h3>Available Features:</h3>
+                        <ul class="feature-list">
+                            <li>Interactive Location Selection</li>
+                            <li>Path Finding Between Points</li>
+                            <li>First & Third Person Views</li>
+                            <li>Real-time Navigation</li>
+                            <li>Mobile-Optimized UI</li>
+                            <li>Offline Functionality</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>System Status:</h3>
+                        <ul class="feature-list">
+                            <li>Navigation Interface: <span style="color: #4CAF50;">Ready</span></li>
+                            <li>Location Data: <span style="color: #4CAF50;">Loaded</span></li>
+                            <li>Path System: <span style="color: #4CAF50;">Active</span></li>
+                            <li>Mobile Mode: <span style="color: #4CAF50;">Enabled</span></li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+            
+            initUI();
+            document.getElementById('loading').classList.add('hidden');
+        }
+        
+        function initUI() {
+            // Populate dropdowns
+            const fromOptions = document.getElementById('from-dropdown-options');
+            const toOptions = document.getElementById('to-dropdown-options');
+            
+            Object.keys(CAMPUS_POINTS).forEach(locationName => {
+                // From dropdown
+                const fromOption = document.createElement('div');
+                fromOption.className = 'dropdown-option';
+                fromOption.textContent = locationName;
+                fromOption.addEventListener('click', function() {
+                    document.querySelectorAll('#from-dropdown .dropdown-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    fromOption.classList.add('selected');
+                    document.getElementById('from-dropdown-text').textContent = locationName;
+                    selectedFromPoint = locationName;
+                    document.getElementById('from-dropdown').classList.remove('open');
+                    updateGeneratePathButton();
+                });
+                fromOptions.appendChild(fromOption);
+                
+                // To dropdown
+                const toOption = document.createElement('div');
+                toOption.className = 'dropdown-option';
+                toOption.textContent = locationName;
+                toOption.addEventListener('click', function() {
+                    document.querySelectorAll('#to-dropdown .dropdown-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    toOption.classList.add('selected');
+                    document.getElementById('to-dropdown-text').textContent = locationName;
+                    selectedToPoint = locationName;
+                    document.getElementById('to-dropdown').classList.remove('open');
+                    updateGeneratePathButton();
+                });
+                toOptions.appendChild(toOption);
+            });
+            
+            // Dropdown toggle
+            document.querySelectorAll('.dropdown-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const dropdown = this.parentElement;
+                    dropdown.classList.toggle('open');
+                });
+            });
+            
+            // Button events
+            document.getElementById('start-path').addEventListener('click', () => {
+                if (selectedFromPoint && selectedToPoint) {
+                    const pathKey = `${selectedFromPoint}_${selectedToPoint}`;
+                    const reversePathKey = `${selectedToPoint}_${selectedFromPoint}`;
+                    
+                    let pathExists = PREDEFINED_PATHS[pathKey] || PREDEFINED_PATHS[reversePathKey];
+                    
+                    if (pathExists) {
+                        alert(`Path found from ${selectedFromPoint} to ${selectedToPoint}!\n\nThis is a mobile-optimized version. The full 3D visualization will be available in the complete implementation.`);
+                    } else {
+                        alert(`Direct path from ${selectedFromPoint} to ${selectedToPoint} will be calculated.\n\nThis is a mobile-optimized version. The full 3D visualization will be available in the complete implementation.`);
+                    }
+                }
+            });
+            
+            // View mode selection
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    const viewMode = this.dataset.view;
+                    console.log('View mode changed to:', viewMode);
+                });
+            });
+        }
+        
+        function updateGeneratePathButton() {
+            const fromSelected = document.querySelector('#from-dropdown .dropdown-option.selected');
+            const toSelected = document.querySelector('#to-dropdown .dropdown-option.selected');
+            const generateBtn = document.getElementById('start-path');
+            
+            if (fromSelected && toSelected) {
+                generateBtn.disabled = false;
+                generateBtn.textContent = 'Find Path';
+            } else {
+                generateBtn.disabled = true;
+                generateBtn.textContent = 'Start';
+            }
+        }
+        
+        // Start with the home screen
+        initHomeScreen();
+    </script>
+</body>
+</html>
